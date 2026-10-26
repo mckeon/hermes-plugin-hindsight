@@ -153,6 +153,10 @@ _spec = importlib.util.spec_from_file_location(
 )
 plugin = importlib.util.module_from_spec(_spec)
 sys.modules["hindsight_hermes"] = plugin
+# pytest also imports the plugin root as a Package node; with a repo name that is not a
+# Python identifier (hermes-plugin-hindsight) it does so as bare "__init__", which
+# breaks the relative imports. Hand it the already-loaded package instead.
+sys.modules.setdefault("__init__", plugin)
 _spec.loader.exec_module(plugin)
 
 
