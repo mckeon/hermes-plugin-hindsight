@@ -68,11 +68,13 @@ from .settings import (
     _normalize_min_scores,
     _normalize_observation_scopes,
     _normalize_string_list,
+    _normalize_user_aliases,
     _parse_float_setting,
     _parse_int_setting,
     _project_name,
     _repository_root,
     _resolve_bank_id_template,
+    _resolve_user_alias,
     _template_fields,
 )
 
@@ -499,6 +501,7 @@ class HindsightMemoryProvider(MemoryProvider):
         self._additional_bank_ids: list[str] = []
         self._recall_additional_bank_ids: list[str] = []
         self._write_bank_ids: list[str] = ["hermes"]
+        self._user_aliases: dict[str, str] = {}
         self._memory_mode = "hybrid"  # "context", "tools", or "hybrid"
         self._prefetch_method = "recall"  # "recall" or "reflect"
         for name in _SESSION_KWARGS:
@@ -676,7 +679,12 @@ class HindsightMemoryProvider(MemoryProvider):
             },
             {
                 "key": "bank_id_template",
-                "description": "Optional template to derive bank_id dynamically. Placeholders: {profile}, {workspace}, {project}, {platform}, {user}, {session}. {project} is the git repository name (shared across worktrees, empty outside a repository). Example: hermes-{project}",
+                "description": "Optional template to derive bank_id dynamically. Placeholders: {profile}, {workspace}, {project}, {platform}, {user}, {user_name}, {session}. {project} is the git repository name (shared across worktrees, empty outside a repository). {user} is the platform user id, mapped through user_aliases when set. Example: hermes-{project}",
+                "default": "",
+            },
+            {
+                "key": "user_aliases",
+                "description": "JSON object mapping platform user ids to the name {user} should render as, e.g. {\"U07ABCDEF\": \"alice\"}. Ids not listed keep their raw value.",
                 "default": "",
             },
             {"key": "bank_mission", "description": "Mission/purpose description for the memory bank"},
@@ -1184,7 +1192,7 @@ class HindsightMemoryProvider(MemoryProvider):
         )
         if self._bank_id_template or self._bank_source == "repository config":
             logger.debug(
-                "Hindsight bank %s from %s (template %r: profile=%s workspace=%s project=%s platform=%s user=%s, cwd=%s)",
+                "Hindsight bank %s from %s (template %r: profile=%s workspace=%s project=%s platform=%s user=%s user_name=%s, cwd=%s)",
                 self._bank_id,
                 self._bank_source,
                 self._bank_id_template,
@@ -1192,7 +1200,8 @@ class HindsightMemoryProvider(MemoryProvider):
                 self._agent_workspace,
                 self._project,
                 self._platform,
-                self._user_id,
+                _resolve_user_alias(self._user_id, self._user_aliases),
+                self._user_name,
                 self._cwd,
             )
         logger.debug(
@@ -1291,7 +1300,8 @@ class HindsightMemoryProvider(MemoryProvider):
             workspace=self._agent_workspace,
             project=self._project,
             platform=self._platform,
-            user=self._user_id,
+            user=_resolve_user_alias(self._user_id, self._user_aliases),
+            user_name=self._user_name,
             session=self._session_id,
         )
 
@@ -1312,6 +1322,9 @@ class HindsightMemoryProvider(MemoryProvider):
         # Precedence: closest .hindsight/config.toml in a trusted repository → template → static bank_id.
         # The repository is only looked up when something needs it, and only once.
         trusted_dirs = _normalize_string_list(cfg.get("trusted_project_dirs"))
+        # Per-profile like the bank itself: a multiplexed secondary must not inherit the
+        # default profile's people map through a raw environment read.
+        self._user_aliases = _normalize_user_aliases(cfg.get("user_aliases") or get_secret("HINDSIGHT_USER_ALIASES", ""))
         uses_project = "project" in _template_fields(self._bank_id_template)
         root, cwd_bank, self._project = None, None, ""
         if self._cwd and (trusted_dirs or uses_project):

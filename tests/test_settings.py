@@ -7,8 +7,10 @@ from hindsight_hermes.settings import (
     _normalize_min_scores,
     _normalize_observation_scopes,
     _normalize_string_list,
+    _normalize_user_aliases,
     _parse_int_setting,
     _resolve_bank_id_template,
+    _resolve_user_alias,
 )
 
 
@@ -81,3 +83,26 @@ def test_clears_min_scores_rejects_a_result_that_does_not_report_the_floored_sta
 def test_clears_min_scores_keeps_a_result_with_no_scores_at_all():
     assert _clears_min_scores(types.SimpleNamespace(scores=None), {"semantic": 0.9})
     assert _clears_min_scores(types.SimpleNamespace(), {"semantic": 0.9})
+
+
+def test_user_aliases_accept_a_mapping_or_a_json_object():
+    assert _normalize_user_aliases({"U07ABC": "alice", " U07DEF ": " bob "}) == {"U07ABC": "alice", "U07DEF": "bob"}
+    assert _normalize_user_aliases('{"U07ABC": "alice"}') == {"U07ABC": "alice"}
+    assert _normalize_user_aliases("") == {}
+    assert _normalize_user_aliases(None) == {}
+
+
+def test_user_aliases_drop_invalid_entries_instead_of_failing():
+    # A bad entry must never stop the provider: the rest of the map still applies.
+    assert _normalize_user_aliases({"U07ABC": "alice", "": "nobody", "U07DEF": 7, "U07GHI": " "}) == {"U07ABC": "alice"}
+    assert _normalize_user_aliases("not json") == {}
+    assert _normalize_user_aliases('["U07ABC"]') == {}
+
+
+def test_user_alias_resolution_falls_back_to_the_raw_id():
+    aliases = {"U07ABC": "alice"}
+    assert _resolve_user_alias("U07ABC", aliases) == "alice"
+    assert _resolve_user_alias("U07ZZZ", aliases) == "U07ZZZ"
+    assert _resolve_user_alias("", aliases) == ""
+    assert _resolve_bank_id_template("{user}", "hermes", user=_resolve_user_alias("U07ABC", aliases)) == "alice"
+    assert _resolve_bank_id_template("{user}", "hermes", user=_resolve_user_alias("", aliases)) == "hermes"

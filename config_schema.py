@@ -75,6 +75,14 @@ CONFIG_SCHEMA = ProviderConfigSchema(
             description="Extra Hindsight banks to recall from but never write to, searched after the write banks (comma-separated). A bank also in Additional banks stays writable.",
         ),
         ProviderField(
+            key="user_aliases",
+            label="User aliases",
+            kind=KIND_TEXT,
+            default="",
+            inline=True,
+            description='JSON object mapping platform user ids to the name {user} renders as in bank_id_template, e.g. {"U07ABCDEF": "alice"}. Unlisted ids keep their raw value.',
+        ),
+        ProviderField(
             key="trusted_project_dirs",
             label="Trusted project folders",
             kind=KIND_TEXT,

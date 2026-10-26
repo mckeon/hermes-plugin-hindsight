@@ -808,3 +808,30 @@ def test_explicit_observation_scopes_win_over_the_default(provider):
     instance.sync_turn("hi", "hello")
     instance.shutdown()
     assert _retain_item(fake)["observation_scopes"] == "combined"
+
+
+def test_user_alias_names_the_bank_for_a_known_user_and_keeps_the_id_otherwise(provider):
+    aliases = {"U07ABC": "alice"}
+    instance, _ = provider({"bank_id_template": "{user}", "user_aliases": aliases}, user_id="U07ABC", user_name="Alice L")
+    assert instance._bank_id == "alice"
+    instance, _ = provider({"bank_id_template": "{user}", "user_aliases": aliases}, user_id="U07ZZZ")
+    assert instance._bank_id == "U07ZZZ"
+    # No user at all (CLI, dashboard): the empty placeholder collapses to the static bank.
+    instance, _ = provider({"bank_id_template": "{user}", "user_aliases": aliases, "bank_id": "hermes-slack"})
+    assert instance._bank_id == "hermes-slack"
+
+
+def test_user_aliases_read_from_the_secret_scope_when_config_has_none(provider):
+    from conftest import SECRETS
+
+    SECRETS["HINDSIGHT_USER_ALIASES"] = '{"U07ABC": "alice"}'
+    instance, _ = provider({"bank_id_template": "{user}"}, user_id="U07ABC")
+    assert instance._bank_id == "alice"
+    # config.json wins over the environment, as for every other setting.
+    instance, _ = provider({"bank_id_template": "{user}", "user_aliases": {"U07ABC": "alicia"}}, user_id="U07ABC")
+    assert instance._bank_id == "alicia"
+
+
+def test_user_name_placeholder_uses_the_display_name(provider):
+    instance, _ = provider({"bank_id_template": "{user_name}"}, user_id="U07ABC", user_name="Alice L")
+    assert instance._bank_id == "Alice-L"

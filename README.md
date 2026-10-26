@@ -221,7 +221,8 @@ Some keys also accept an older name: `apiKey` for `api_key`, `budget` for `recal
 | Key | Default | Description |
 |-----|---------|-------------|
 | `bank_id` | `hermes` | Memory bank name (static fallback used when `bank_id_template` is unset or resolves empty) |
-| `bank_id_template` | — | Optional template to derive the bank name dynamically. Placeholders: `{profile}`, `{workspace}`, `{project}`, `{platform}`, `{user}`, `{session}`. `{project}` is the name of the git repository Hermes runs in; every worktree of a repository resolves to the same name, and it is empty outside a repository or for one rooted at your home directory. Example: `hermes-{profile}` isolates memory per active Hermes profile, `{project}` gives each repository its own bank. Empty placeholders collapse cleanly (e.g. `hermes-{user}` with no user becomes `hermes`). |
+| `bank_id_template` | — | Optional template to derive the bank name dynamically. Placeholders: `{profile}`, `{workspace}`, `{project}`, `{platform}`, `{user}`, `{user_name}`, `{session}`. `{user}` is the platform's stable user id (a Slack `U07...`), rendered through `user_aliases` when one is configured; `{user_name}` is the platform display name, which can change and then starts a new bank. `{project}` is the name of the git repository Hermes runs in; every worktree of a repository resolves to the same name, and it is empty outside a repository or for one rooted at your home directory. Example: `hermes-{profile}` isolates memory per active Hermes profile, `{project}` gives each repository its own bank. Empty placeholders collapse cleanly (e.g. `hermes-{user}` with no user becomes `hermes`). |
+| `user_aliases` | — | JSON object mapping platform user ids to the name `{user}` renders as, e.g. `{"U07ABCDEF": "alice"}`. Lets one person's Slack sessions, own Hermes profile and IDE client (`/mcp/alice/`) share a bank. Unlisted ids keep their raw value. Env fallback: `HINDSIGHT_USER_ALIASES`. |
 | `mirror_to_own_bank` | `false` | Also write to `bank_id` when the template resolves to a different bank, so a profile keeps its own memory while working in project banks. |
 | `additional_banks` | — | Extra banks to write to and recall from, in priority order. |
 | `recall_additional_banks` | — | Extra banks to recall from but never write to, searched after the write banks. Alias `recallAdditionalBanks`, the name the Claude Code integration uses. A bank also listed in `additional_banks` stays writable. |
@@ -358,6 +359,7 @@ These are used whenever the matching config key is not set:
 | `HINDSIGHT_API_KEY` | Hindsight API key (`api_key`) |
 | `HINDSIGHT_API_URL` | API endpoint (`api_url`) |
 | `HINDSIGHT_BANK_ID` | Bank name; when set, wins over `bank_id` in `config.json` (a `bank_id_template` still takes precedence) |
+| `HINDSIGHT_USER_ALIASES` | JSON object for `user_aliases` (profile-scoped, read through the secret scope) |
 | `HINDSIGHT_TIMEOUT` | API request timeout in seconds (`timeout`) |
 | `HINDSIGHT_LLM_API_KEY` | LLM API key for local_embedded (`llm_api_key`); `HINDSIGHT_API_LLM_API_KEY` also works |
 | `HINDSIGHT_API_LLM_BASE_URL` | LLM endpoint for local_embedded (`llm_base_url`) |

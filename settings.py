@@ -180,6 +180,39 @@ def _normalize_observation_scopes(value: Any) -> Any:
     return [s for s in scopes if s] or None
 
 
+def _normalize_user_aliases(value: Any) -> dict[str, str]:
+    """Normalize ``user_aliases`` to ``{platform user id: alias}``. Accepts a mapping or a
+    JSON object string (the settings panel stores text). Keys and values are stripped; an
+    entry whose key or value is empty, or whose value is not text, is dropped with a
+    warning rather than failing the session."""
+    if value is None or value == "":
+        return {}
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            logger.warning("Invalid user_aliases %r (not valid JSON); no aliases applied", value)
+            return {}
+    if not isinstance(value, dict):
+        logger.warning("Invalid user_aliases %r (expected an object); no aliases applied", value)
+        return {}
+    aliases: dict[str, str] = {}
+    for key, alias in value.items():
+        user_id = str(key).strip()
+        if not user_id or not isinstance(alias, str) or not alias.strip():
+            logger.warning("Ignoring user_aliases[%r]=%r: key and value must be non-empty text", key, alias)
+            continue
+        aliases[user_id] = alias.strip()
+    return aliases
+
+
+def _resolve_user_alias(user_id: str, aliases: dict[str, str]) -> str:
+    """Value of the ``{user}`` placeholder: the alias configured for *user_id*, else the id
+    itself. Platform ids are stable but opaque (a Slack ``U07...``); an alias lets one
+    person's banks share a name across Slack, their own profile and their IDE client."""
+    return aliases.get(user_id, user_id) if user_id else ""
+
+
 def _sanitize_bank_segment(value: str) -> str:
     """URL/filesystem-safe bank_id placeholder: runs outside ``[A-Za-z0-9_-]`` (per
     ``str.isalnum``) become one dash; leading/trailing ``-``/``_`` are stripped."""
@@ -188,7 +221,7 @@ def _sanitize_bank_segment(value: str) -> str:
 
 
 def _resolve_bank_id_template(template: str, fallback: str, **placeholders: str) -> str:
-    """Render a bank_id template ({profile}, {workspace}, {project}, {platform}, {user}, {session}),
+    """Render a bank_id template ({profile}, {workspace}, {project}, {platform}, {user}, {user_name}, {session}),
     sanitizing each placeholder; the ``-``/``_`` runs empty placeholders leave are
     collapsed (``hermes-{user}`` -> ``hermes``). Empty/invalid template -> *fallback*."""
     if not template:
