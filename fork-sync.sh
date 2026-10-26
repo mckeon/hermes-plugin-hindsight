@@ -19,7 +19,7 @@ NEW=$(git -C "$W/filtered" rev-parse HEAD)
 git fetch -q "$W/filtered" HEAD
 git merge-base --is-ancestor main "$NEW" || { echo "filtered history does not fast-forward main; filter changed?"; exit 1; }
 git branch -f main "$NEW"
-sed -i.bak -E "s|^  Current: [0-9a-f]{40}.*|  Current: $SHA|" FORK.md && rm FORK.md.bak
 git rebase --onto main "$(git merge-base main user-aliases)" user-aliases
-git add FORK.md && git commit -q -m "fork: upstream base $SHA" || true
+sed -i.bak -E "s|^(  Current: )[0-9a-f]{40}|\\1$SHA|" FORK.md && rm FORK.md.bak
+if ! git diff --quiet FORK.md; then git add FORK.md && git commit -q -m "fork: upstream base $SHA"; fi
 echo "main -> $NEW; user-aliases rebased. Now run tests, tag, push."
